@@ -24,13 +24,21 @@ const HEADERS = {
   'Origin': 'https://xoso.me',
 }
 
-async function tryFetch(url, timeout = 10000) {
-  const res = await fetch(url, {
-    headers: HEADERS,
-    signal: AbortSignal.timeout(timeout),
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.text()
+async function tryFetch(url, timeout = 12000) {
+  // Thử trực tiếp trước
+  try {
+    const res = await fetch(url, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(timeout),
+    })
+    if (res.ok) return res.text()
+  } catch {}
+
+  // Fallback: dùng allorigins.win làm proxy (vượt block IP)
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+  const res2 = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeout) })
+  if (!res2.ok) throw new Error(`HTTP ${res2.status}`)
+  return res2.text()
 }
 
 // Parse JSONP: setData({...})  hoặc JSON thuần
