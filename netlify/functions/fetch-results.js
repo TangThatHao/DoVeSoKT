@@ -64,7 +64,8 @@ function parseHTML(html) {
     cellReg.lastIndex = 0
     const rowHtml = row[1]
     while ((cell = cellReg.exec(rowHtml)) !== null) {
-      const text = cell[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim()
+      // Dùng space khi xóa tag để tránh số bị dính: "82950"+"51229" → "82950 51229"
+      const text = cell[1].replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim()
       if (text) cells.push(text)
     }
     if (cells.length < 2) continue
@@ -187,17 +188,15 @@ export const handler = async (event) => {
     })}
   }
 
-  // Parse HTML nhanh bằng regex
-  let prizes = parseHTML(html)
+  // Dùng Groq parse (chính xác hơn regex với mọi cấu trúc HTML)
+  let prizes = {}
+  try {
+    const parsed = await groqParse(html, apiKey)
+    if (parsed.prizes) prizes = parsed.prizes
+  } catch {}
 
-  // Fallback Groq nếu regex không lấy được đủ giải
-  if (Object.keys(prizes).length < 3) {
-    try {
-      const fallback = await groqParse(html, apiKey)
-      if (fallback.prizes && Object.keys(fallback.prizes).length > Object.keys(prizes).length)
-        prizes = fallback.prizes
-    } catch {}
-  }
+  // Fallback regex nếu Groq fail
+  if (Object.keys(prizes).length < 3) prizes = parseHTML(html)
 
   if (Object.keys(prizes).length === 0)
     return { statusCode: 404, body: JSON.stringify({ error: `Không tìm thấy kết quả ngày ${date}.` }) }
