@@ -227,9 +227,32 @@ export default function App() {
     setChecking(true); setError(''); setResults(null); setPrizes(null)
     try {
       const [y,m,d] = date.split('-')
-      const res = await fetch('/.netlify/functions/fetch-results', {
+      const dateDMY = `${d}-${m}-${y}`
+
+      // Bước 1: Browser fetch HTML trực tiếp (IP Việt Nam)
+      setError('')
+      const targetUrl = `https://www.xosominhngoc.com/ket-qua-xo-so/${region}/${dateDMY}`
+      const proxyUrl  = `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
+
+      let htmlText = ''
+      try {
+        const htmlRes = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) })
+        if (htmlRes.ok) htmlText = await htmlRes.text()
+      } catch(e) {
+        // Thử proxy thay thế
+        try {
+          const alt = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+          const altRes = await fetch(alt, { signal: AbortSignal.timeout(15000) })
+          if (altRes.ok) htmlText = await altRes.text()
+        } catch {}
+      }
+
+      if (!htmlText) throw new Error('Không lấy được trang kết quả. Kiểm tra kết nối mạng.')
+
+      // Bước 2: Gửi HTML cho Groq phân tích qua Netlify Function
+      const res = await fetch('/.netlify/functions/parse-results', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ date:`${d}-${m}-${y}`, region, province }),
+        body: JSON.stringify({ htmlText, date: dateDMY, province }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error||'Không lấy được kết quả')
