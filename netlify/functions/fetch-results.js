@@ -142,14 +142,12 @@ export const handler = async (event) => {
 
   // Danh sách URL thử theo thứ tự ưu tiên
   const urlsToTry = [
-    // API JSON chính thức xoso.me
+    // Trang chính — có www
+    `https://www.xosominhngoc.com/ket-qua-xo-so/${regionId}/${date}`,
+    `https://www.xosominhngoc.com/ket-qua-xo-so/${regionId}/`,
+    `https://www.xosominhngoc.com/`,
+    // Backup API xoso.me
     `https://api.xoso.me/xs/${regionId}/${isoDate}.js`,
-    // Backup: xoso.net.vn
-    `https://xoso.net.vn/api/v1/xs/${regionId}/${isoDate}`,
-    // Backup: xsapi
-    `https://xsapi.net/api/xs?region=${regionId}&date=${isoDate}`,
-    // Fallback: trang chủ xosominhngoc
-    `https://www.minhngoc.net.vn/ket-qua-xo-so/${regionId}.html`,
   ]
 
   let lastError = ''
