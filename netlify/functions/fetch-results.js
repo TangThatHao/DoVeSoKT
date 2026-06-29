@@ -1,7 +1,131 @@
-// Dùng Groq Compound Beta (có web search) để tìm kết quả xổ số
 import Groq from 'groq-sdk'
 
+// ─── Province → URL slug ──────────────────────────────────────────────────────
+const SLUG = {
+  // Miền Nam
+  'TP. Hồ Chí Minh': 'tp-hcm',   'Đồng Nai': 'dong-nai',
+  'Cần Thơ': 'can-tho',           'Đồng Tháp': 'dong-thap',
+  'Cà Mau': 'ca-mau',             'Bến Tre': 'ben-tre',
+  'Vũng Tàu': 'vung-tau',         'Bạc Liêu': 'bac-lieu',
+  'Bình Dương': 'binh-duong',     'An Giang': 'an-giang',
+  'Tây Ninh': 'tay-ninh',         'Bình Thuận': 'binh-thuan',
+  'Vĩnh Long': 'vinh-long',       'Bình Phước': 'binh-phuoc',
+  'Trà Vinh': 'tra-vinh',         'Long An': 'long-an',
+  'Tiền Giang': 'tien-giang',     'Kiên Giang': 'kien-giang',
+  'Hậu Giang': 'hau-giang',       'Sóc Trăng': 'soc-trang',
+  // Miền Trung
+  'Đà Nẵng': 'da-nang',           'Khánh Hòa': 'khanh-hoa',
+  'Thừa Thiên Huế': 'thua-thien-hue', 'Phú Yên': 'phu-yen',
+  'Quảng Nam': 'quang-nam',       'Bình Định': 'binh-dinh',
+  'Quảng Ngãi': 'quang-ngai',     'Đắk Lắk': 'dak-lak',
+  'Quảng Bình': 'quang-binh',     'Quảng Trị': 'quang-tri',
+  'Ninh Thuận': 'ninh-thuan',     'Gia Lai': 'gia-lai',
+  'Đắk Nông': 'dak-nong',         'Kon Tum': 'kon-tum',
+  // Miền Bắc
+  'Hà Nội': 'ha-noi',             'Nam Định': 'nam-dinh',
+  'Thái Bình': 'thai-binh',       'Hải Phòng': 'hai-phong',
+  'Ninh Bình': 'ninh-binh',       'Bắc Ninh': 'bac-ninh',
+  'Bắc Giang': 'bac-giang',       'Hưng Yên': 'hung-yen',
+  'Vĩnh Phúc': 'vinh-phuc',       'Hải Dương': 'hai-duong',
+  'Quảng Ninh': 'quang-ninh',     'Thái Nguyên': 'thai-nguyen',
+}
+
+const PRIZE_NAMES = {
+  'đặc biệt': 'Đặc Biệt', 'db': 'Đặc Biệt',
+  'nhất': 'Giải Nhất', '1': 'Giải Nhất',
+  'nhì': 'Giải Nhì',   '2': 'Giải Nhì',
+  'ba': 'Giải Ba',     '3': 'Giải Ba',
+  'tư': 'Giải Tư',     '4': 'Giải Tư',
+  'năm': 'Giải Năm',   '5': 'Giải Năm',
+  'sáu': 'Giải Sáu',   '6': 'Giải Sáu',
+  'bảy': 'Giải Bảy',   '7': 'Giải Bảy',
+  'tám': 'Giải Tám',   '8': 'Giải Tám',
+}
 const PRIZE_ORDER = ['Đặc Biệt','Giải Nhất','Giải Nhì','Giải Ba','Giải Tư','Giải Năm','Giải Sáu','Giải Bảy','Giải Tám']
+
+function normalizePrize(raw) {
+  const s = raw.toLowerCase().replace(/giải\s*/,'').trim()
+  return PRIZE_NAMES[s] ?? null
+}
+
+// Parse HTML → prizes (regex, không cần cheerio)
+function parseHTML(html) {
+  const prizes = {}
+
+  // Xóa tags, giữ cấu trúc row/cell bằng placeholder
+  const rowRx  = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+  const cellRx = /<td[^>]*>([\s\S]*?)<\/td>/gi
+
+  let row
+  while ((row = rowRx.exec(html)) !== null) {
+    const cells = []
+    let cell
+    const cellReg = /<td[^>]*>([\s\S]*?)<\/td>/gi
+    cellReg.lastIndex = 0
+    const rowHtml = row[1]
+    while ((cell = cellReg.exec(rowHtml)) !== null) {
+      const text = cell[1].replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim()
+      if (text) cells.push(text)
+    }
+    if (cells.length < 2) continue
+    const prizeName = normalizePrize(cells[0])
+    if (!prizeName) continue
+    const numbers = cells.slice(1)
+      .flatMap(c => c.split(/[\s,]+/))
+      .map(s => s.replace(/\D/g,''))
+      .filter(s => s.length >= 2)
+    if (numbers.length) {
+      if (!prizes[prizeName]) prizes[prizeName] = []
+      prizes[prizeName].push(...numbers)
+    }
+  }
+
+  return prizes
+}
+
+async function fetchDirect(url) {
+  const HDRS = {
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,*/*;q=0.9',
+    'Accept-Language': 'vi-VN,vi;q=0.9',
+    'Referer': 'https://www.xosominhngoc.com/',
+  }
+  // Thử trực tiếp
+  try {
+    const r = await fetch(url, { headers: HDRS, signal: AbortSignal.timeout(8000) })
+    if (r.ok) return r.text()
+  } catch {}
+  // Thử allorigins proxy
+  try {
+    const r = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      { signal: AbortSignal.timeout(10000) })
+    if (r.ok) return r.text()
+  } catch {}
+  // Thử corsproxy
+  const r = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    { signal: AbortSignal.timeout(10000) })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.text()
+}
+
+// Groq parse fallback — chỉ dùng khi regex thất bại
+async function groqParse(text, apiKey) {
+  const groq = new Groq({ apiKey })
+  const snippet = text.replace(/<script[\s\S]*?<\/script>/gi,'')
+    .replace(/<style[\s\S]*?<\/style>/gi,'')
+    .replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0, 5000)
+
+  const r = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role:'user', content:
+      `Nội dung trang xổ số:\n${snippet}\n\nTrả về JSON thuần:\n{"prizes":{"Đặc Biệt":["123456"],"Giải Nhất":["12345"],...},"station":"tên đài"}\nNếu không có dữ liệu: {"error":"no data"}` }],
+    max_tokens: 600, temperature: 0.1,
+  })
+  const raw = r.choices[0]?.message?.content ?? '{}'
+  const cleaned = raw.replace(/```json?\n?/g,'').replace(/```/g,'').trim()
+  const m = cleaned.match(/\{[\s\S]*\}/)
+  return JSON.parse(m ? m[0] : cleaned)
+}
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST')
@@ -12,91 +136,79 @@ export const handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'GROQ_API_KEY chưa cấu hình' }) }
 
   let body
-  try { body = JSON.parse(event.body) } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }
+  try { body = JSON.parse(event.body) }
+  catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) } }
+
+  const { date, region, province } = body  // date = DD-MM-YYYY
+  if (!date || !region)
+    return { statusCode: 400, body: JSON.stringify({ error: 'Thiếu tham số' }) }
+
+  const slug = SLUG[province] ?? region
+  // URL đúng định dạng: /ket-qua-xo-so/{region}/{province-slug}/{DD-MM-YYYY}.html
+  const urls = [
+    `https://www.xosominhngoc.com/ket-qua-xo-so/${region}/${slug}/${date}.html`,
+    `https://www.xosominhngoc.com/ket-qua-xo-so/${region}/${date}.html`,
+    `https://www.xosominhngoc.com/ket-qua-xo-so/${region}/`,
+  ]
+
+  let html = null
+  let lastErr = ''
+  for (const url of urls) {
+    try {
+      html = await fetchDirect(url)
+      if (html && html.toLowerCase().includes('đặc biệt')) break
+      html = null
+    } catch(e) { lastErr = e.message }
   }
 
-  const { date, region, province } = body
-  if (!date || !region)
-    return { statusCode: 400, body: JSON.stringify({ error: 'Thiếu date hoặc region' }) }
-
-  // date format: DD-MM-YYYY
-  const [d, m, y] = date.split('-')
-
-  const regionLabel = region === 'mien-nam' ? 'miền Nam' : region === 'mien-bac' ? 'miền Bắc' : 'miền Trung'
-  const stationInfo = province ? `đài ${province}` : regionLabel
-
-  try {
-    const groq = new Groq({ apiKey })
-
-    // Groq Compound Beta tự search web tìm kết quả xổ số
-    const completion = await groq.chat.completions.create({
-      model: 'compound-beta',
-      messages: [{
-        role: 'user',
-        content: `Tìm kết quả xổ số ${regionLabel} ${stationInfo} ngày ${d}/${m}/${y} trên trang xosominhngoc.com hoặc các trang xổ số Việt Nam.
-
-Sau khi tìm được, trả về JSON thuần (không markdown):
-{
-  "prizes": {
-    "Đặc Biệt": ["6chuso"],
-    "Giải Nhất": ["5chuso"],
-    "Giải Nhì": ["5chuso"],
-    "Giải Ba": ["5chuso","5chuso"],
-    "Giải Tư": ["5chuso","5chuso","5chuso","5chuso","5chuso","5chuso","5chuso"],
-    "Giải Năm": ["4chuso"],
-    "Giải Sáu": ["4chuso","4chuso","4chuso"],
-    "Giải Bảy": ["3chuso","3chuso","3chuso","3chuso"],
-    "Giải Tám": ["2chuso","2chuso","2chuso"]
-  },
-  "station": "tên đài thực tế xổ ngày đó"
-}
-
-Chỉ điền các giải có trong kết quả thực tế. Nếu không tìm được trả về: {"error":"Không tìm thấy kết quả ngày ${d}/${m}/${y}"}`
-      }],
-      max_tokens: 1000,
-      temperature: 0.1,
-    })
-
-    const raw = completion.choices[0]?.message?.content ?? '{}'
-    const cleaned = raw.replace(/```json?\n?/g,'').replace(/```/g,'').trim()
-
-    let parsed
-    try { parsed = JSON.parse(cleaned) }
-    catch {
-      // Groq có thể trả về text kèm JSON — tìm JSON trong đó
-      const match = cleaned.match(/\{[\s\S]*\}/)
-      if (match) parsed = JSON.parse(match[0])
-      else throw new Error('Không parse được JSON từ Groq: ' + cleaned.slice(0,200))
-    }
-
-    if (parsed.error) {
-      return { statusCode: 404, body: JSON.stringify({ error: parsed.error }) }
-    }
-
-    if (!parsed.prizes || Object.keys(parsed.prizes).length === 0) {
-      return { statusCode: 404, body: JSON.stringify({ error: `Không có kết quả xổ số ${regionLabel} ngày ${date}` }) }
-    }
-
-    // Sắp xếp theo thứ tự giải chuẩn
-    const sorted = {}
-    for (const name of PRIZE_ORDER) {
-      if (parsed.prizes[name]?.length) sorted[name] = parsed.prizes[name]
-    }
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prizes: sorted,
-        date,
-        station: parsed.station || province,
+  if (!html) {
+    // Cuối cùng thử Groq web search (compound-beta)
+    try {
+      const groq = new Groq({ apiKey })
+      const [d,m,y] = date.split('-')
+      const completion = await groq.chat.completions.create({
+        model: 'compound-beta',
+        messages: [{ role:'user', content:
+          `Kết quả xổ số ${province} ngày ${d}/${m}/${y} trên xosominhngoc.com. Trả JSON: {"prizes":{"Đặc Biệt":["..."],...},"station":"..."}` }],
+        max_tokens: 600, temperature: 0.1,
       })
-    }
-  } catch(e) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Lỗi tìm kiếm: ' + e.message })
-    }
+      const raw = completion.choices[0]?.message?.content ?? '{}'
+      const m2 = raw.replace(/```json?\n?/g,'').replace(/```/g,'').match(/\{[\s\S]*\}/)
+      const parsed = JSON.parse(m2 ? m2[0] : '{}')
+      if (parsed.prizes && Object.keys(parsed.prizes).length > 0) {
+        const sorted = {}
+        for (const n of PRIZE_ORDER) if (parsed.prizes[n]) sorted[n] = parsed.prizes[n]
+        return { statusCode: 200, headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ prizes: sorted, date, station: parsed.station || province }) }
+      }
+    } catch {}
+    return { statusCode: 502, body: JSON.stringify({
+      error: `Không lấy được kết quả ngày ${date}. Có thể chưa có kết quả hoặc đài không xổ ngày này.`
+    })}
+  }
+
+  // Parse HTML nhanh bằng regex
+  let prizes = parseHTML(html)
+
+  // Fallback Groq nếu regex không lấy được đủ giải
+  if (Object.keys(prizes).length < 3) {
+    try {
+      const fallback = await groqParse(html, apiKey)
+      if (fallback.prizes && Object.keys(fallback.prizes).length > Object.keys(prizes).length)
+        prizes = fallback.prizes
+    } catch {}
+  }
+
+  if (Object.keys(prizes).length === 0)
+    return { statusCode: 404, body: JSON.stringify({ error: `Không tìm thấy kết quả ngày ${date}.` }) }
+
+  // Sắp xếp theo thứ tự giải
+  const sorted = {}
+  for (const n of PRIZE_ORDER) if (prizes[n]?.length) sorted[n] = prizes[n]
+
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prizes: sorted, date, station: province })
   }
 }
