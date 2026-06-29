@@ -109,17 +109,37 @@ async function fetchDirect(url) {
   return r.text()
 }
 
-// Groq parse fallback — chỉ dùng khi regex thất bại
-async function groqParse(text, apiKey) {
+// Groq parse — lọc đúng 1 đài
+async function groqParse(text, apiKey, province) {
   const groq = new Groq({ apiKey })
   const snippet = text.replace(/<script[\s\S]*?<\/script>/gi,'')
     .replace(/<style[\s\S]*?<\/style>/gi,'')
-    .replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0, 5000)
+    .replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0, 6000)
 
   const r = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [{ role:'user', content:
-      `Nội dung trang xổ số:\n${snippet}\n\nTrả về JSON thuần:\n{"prizes":{"Đặc Biệt":["123456"],"Giải Nhất":["12345"],...},"station":"tên đài"}\nNếu không có dữ liệu: {"error":"no data"}` }],
+      `Trang web xổ số có thể chứa nhiều đài. Hãy chỉ lấy kết quả của đài "${province}".
+
+Nội dung trang:
+${snippet}
+
+Trả về JSON thuần (không markdown) CHỈ của đài ${province}:
+{
+  "prizes": {
+    "Đặc Biệt": ["6chuso"],
+    "Giải Nhất": ["5chuso"],
+    "Giải Nhì": ["5chuso"],
+    "Giải Ba": ["5chuso","5chuso"],
+    "Giải Tư": ["5chuso","5chuso","5chuso","5chuso","5chuso","5chuso","5chuso"],
+    "Giải Năm": ["4chuso"],
+    "Giải Sáu": ["4chuso","4chuso","4chuso"],
+    "Giải Bảy": ["3chuso","3chuso","3chuso","3chuso"],
+    "Giải Tám": ["2chuso","2chuso","2chuso"]
+  },
+  "station": "${province}"
+}
+Nếu không tìm thấy đài "${province}" trả về: {"error":"no data"}` }],
     max_tokens: 600, temperature: 0.1,
   })
   const raw = r.choices[0]?.message?.content ?? '{}'
@@ -188,11 +208,11 @@ export const handler = async (event) => {
     })}
   }
 
-  // Dùng Groq parse (chính xác hơn regex với mọi cấu trúc HTML)
+  // Dùng Groq parse — truyền province để lọc đúng 1 đài
   let prizes = {}
   try {
-    const parsed = await groqParse(html, apiKey)
-    if (parsed.prizes) prizes = parsed.prizes
+    const parsed = await groqParse(html, apiKey, province)
+    if (parsed.prizes && Object.keys(parsed.prizes).length >= 3) prizes = parsed.prizes
   } catch {}
 
   // Fallback regex nếu Groq fail
