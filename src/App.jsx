@@ -185,27 +185,27 @@ export default function App() {
   const isWin = checkResult && checkResult.wins.length > 0
 
   return (
-    <div className="min-h-screen py-6 px-4">
+    <div className="min-h-screen py-4 px-3 sm:py-6 sm:px-4">
       {/* ── Header ── */}
-      <header className="max-w-2xl mx-auto mb-6 text-center">
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <span className="text-4xl">🎰</span>
-          <h1 className="text-4xl font-black text-shimmer tracking-wide">DÒ VÉ SỐ AI</h1>
-          <span className="text-4xl">🎰</span>
+      <header className="max-w-2xl mx-auto mb-4 text-center">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <span className="text-3xl sm:text-4xl">🎰</span>
+          <h1 className="text-3xl sm:text-4xl font-black text-shimmer tracking-wide">DÒ VÉ SỐ AI</h1>
+          <span className="text-3xl sm:text-4xl">🎰</span>
         </div>
-        <p className="text-gold-400 text-sm font-medium opacity-70">Nhận diện vé số thông minh · Dò kết quả tự động</p>
-        <div className="dragon-divider mt-3">✦ ✦ ✦ ✦ ✦</div>
+        <p className="text-gold-400 text-xs sm:text-sm font-medium opacity-70">Nhận diện vé số thông minh · Dò kết quả tự động</p>
+        <div className="dragon-divider mt-2 text-base sm:text-xl">✦ ✦ ✦ ✦ ✦</div>
       </header>
 
-      <div className="max-w-2xl mx-auto space-y-4">
+      <div className="max-w-2xl mx-auto space-y-3 sm:space-y-4">
 
         {/* ── Input Card ── */}
-        <div className="card-lottery rounded-2xl p-6">
-          <h2 className="text-gold-400 font-bold text-lg mb-4 flex items-center gap-2">
+        <div className="card-lottery rounded-2xl p-4 sm:p-6">
+          <h2 className="text-gold-400 font-bold text-base sm:text-lg mb-3 sm:mb-4 flex items-center gap-2">
             <span>📋</span> Thông Tin Vé Số
           </h2>
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-3">
             {/* Date */}
             <div>
               <label className="block text-gold-400 text-xs font-semibold mb-1 uppercase tracking-wider">Ngày Xổ</label>
@@ -252,11 +252,11 @@ export default function App() {
             <input
               type="text"
               inputMode="numeric"
-              placeholder="Nhập 6 số trên vé (VD: 123456)"
+              placeholder="Nhập 6 số (VD: 123456)"
               maxLength={6}
               value={ticketNumber}
               onChange={e => setTicketNumber(e.target.value.replace(/\D/g,'').slice(0,6))}
-              className="input-lottery w-full rounded-lg px-3 py-2.5 text-lg font-mono tracking-[0.3em] text-center"
+              className="input-lottery w-full rounded-lg px-3 py-2.5 text-lg font-mono tracking-[0.2em] sm:tracking-[0.3em] text-center"
             />
             {/* Visual digit boxes */}
             {ticketNumber && (
@@ -272,7 +272,7 @@ export default function App() {
 
           {/* Image upload zone */}
           <div
-            className={`upload-zone rounded-xl p-5 text-center mb-3 ${dragging ? 'dragging' : ''}`}
+            className={`upload-zone rounded-xl p-4 sm:p-5 text-center mb-3 ${dragging ? 'dragging' : ''}`}
             onDragOver={e => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
@@ -329,7 +329,7 @@ export default function App() {
           <button
             onClick={checkLottery}
             disabled={checking || !ticketNumber}
-            className="w-full btn-gold rounded-xl py-4 text-base flex items-center justify-center gap-2 disabled:opacity-40"
+            className="w-full btn-gold rounded-xl py-4 sm:py-4 text-base sm:text-lg flex items-center justify-center gap-2 disabled:opacity-40"
           >
             {checking
               ? <><div className="spinner w-5 h-5" /> Đang dò vé...</>
@@ -345,7 +345,7 @@ export default function App() {
 
         {/* ── Results ── */}
         {checkResult && (
-          <div ref={resultRef} className="card-lottery rounded-2xl p-6 space-y-4">
+          <div ref={resultRef} className="card-lottery rounded-2xl p-4 sm:p-6 space-y-3 sm:space-y-4">
 
             {/* Win / Lose banner */}
             {isWin ? (
@@ -372,7 +372,7 @@ export default function App() {
             )}
 
             {/* Draw info */}
-            <div className="flex items-center justify-between text-xs text-gold-600 bg-black/20 rounded-lg px-4 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-gold-600 bg-black/20 rounded-lg px-3 py-2">
               <span>📅 Ngày: <span className="text-gold-400 font-semibold">{checkResult.drawDate}</span></span>
               <span>🏛️ Đài: <span className="text-gold-400 font-semibold">{checkResult.station}</span></span>
               <span>🎟️ Vé: <span className="text-gold-400 font-mono font-bold">{checkResult.ticketNum}</span></span>
@@ -430,8 +430,8 @@ export default function App() {
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="max-w-2xl mx-auto mt-8 text-center">
+      {/* Footer — extra bottom padding cho iPhone home bar */}
+      <footer className="max-w-2xl mx-auto mt-6 pb-6 text-center">
         <p className="text-gray-700 text-xs">🤖 Powered by Groq AI · 🍀 Chúc may mắn!</p>
       </footer>
     </div>
