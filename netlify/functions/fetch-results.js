@@ -1,181 +1,175 @@
-// Fetch & parse lottery results from xosominhngoc.com
-import * as cheerio from 'cheerio'
+import Groq from 'groq-sdk'
 
-const PRIZE_ORDER = ['Đặc Biệt','Giải Nhất','Giải Nhì','Giải Ba','Giải Tư','Giải Năm','Giải Sáu','Giải Bảy','Giải Tám']
-
-// Map Vietnamese prize names from site → our standard names
-const PRIZE_NAME_MAP = {
-  'đặc biệt': 'Đặc Biệt', 'db': 'Đặc Biệt', 'đb': 'Đặc Biệt', 'giải đặc biệt': 'Đặc Biệt',
-  'giải nhất': 'Giải Nhất', 'giải 1': 'Giải Nhất', 'nhất': 'Giải Nhất',
-  'giải nhì': 'Giải Nhì',  'giải 2': 'Giải Nhì',  'nhì': 'Giải Nhì',
-  'giải ba':  'Giải Ba',   'giải 3': 'Giải Ba',   'ba': 'Giải Ba',
-  'giải tư':  'Giải Tư',   'giải 4': 'Giải Tư',   'tư': 'Giải Tư',
-  'giải năm': 'Giải Năm',  'giải 5': 'Giải Năm',  'năm': 'Giải Năm',
-  'giải sáu': 'Giải Sáu',  'giải 6': 'Giải Sáu',  'sáu': 'Giải Sáu',
-  'giải bảy': 'Giải Bảy',  'giải 7': 'Giải Bảy',  'bảy': 'Giải Bảy',
-  'giải tám': 'Giải Tám',  'giải 8': 'Giải Tám',  'tám': 'Giải Tám',
-  'giải chín':'Giải Tám',  'giải 9': 'Giải Tám',
-}
-
-function normalizePrizeName(raw) {
-  const key = raw.toLowerCase().trim().replace(/\s+/g,' ')
-  return PRIZE_NAME_MAP[key] ?? null
-}
-
-function extractNumbers(text) {
-  return (text.match(/\d{2,8}/g) ?? []).filter(n => n.length >= 2)
+// Các URL pattern để thử
+function buildUrls(date, region) {
+  // date format đầu vào: DD-MM-YYYY
+  const [d, m, y] = date.split('-')
+  return [
+    `https://xosominhngoc.com/ket-qua-xo-so/${region}/${d}-${m}-${y}`,
+    `https://xosominhngoc.com/ket-qua-xo-so/${region}`,
+    `https://xosominhngoc.com/`,
+  ]
 }
 
 async function fetchHTML(url) {
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.5',
+      'Accept-Language': 'vi-VN,vi;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
       'Cache-Control': 'no-cache',
       'Referer': 'https://xosominhngoc.com/',
     },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(12000),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) throw new Error(`HTTP ${res.status} từ ${url}`)
   return res.text()
 }
 
-function parseResultsHTML(html) {
-  const $ = cheerio.load(html)
-  const prizes = {}
+// Rút gọn HTML — lấy phần có kết quả xổ số, bỏ header/footer/script
+function extractRelevantText(html) {
+  // Xóa script, style, head
+  let text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 
-  // Strategy 1: look for table rows with prize labels
-  $('table tr, .result-table tr, .kqxs-table tr').each((_, row) => {
-    const cells = $(row).find('td, th')
-    if (cells.length < 2) return
-    const labelCell = $(cells[0]).text().trim()
-    const mapped = normalizePrizeName(labelCell)
-    if (!mapped) return
-    const nums = []
-    cells.slice(1).each((_, td) => {
-      const t = $(td).text()
-      extractNumbers(t).forEach(n => nums.push(n))
-    })
-    if (nums.length) {
-      if (!prizes[mapped]) prizes[mapped] = []
-      prizes[mapped].push(...nums)
-    }
+  // Tìm đoạn chứa từ khóa kết quả xổ số
+  const keywords = ['đặc biệt', 'giải nhất', 'giải nhì', 'giải ba', 'kết quả']
+  const lc = text.toLowerCase()
+  let start = -1
+  for (const kw of keywords) {
+    const idx = lc.indexOf(kw)
+    if (idx !== -1 && (start === -1 || idx < start)) start = idx
+  }
+
+  if (start > 200) start -= 200
+  else start = 0
+
+  // Lấy tối đa 4000 ký tự từ vùng kết quả
+  return text.slice(start, start + 4000)
+}
+
+// Dùng Groq để phân tích text và trả về prizes JSON
+async function parseWithGroq(text, apiKey, date, region) {
+  const groq = new Groq({ apiKey })
+  const prompt = `Bạn là AI phân tích kết quả xổ số Việt Nam.
+Dưới đây là nội dung trang web xổ số. Hãy trích xuất kết quả xổ số và trả về JSON.
+
+Nội dung trang:
+${text}
+
+Trả về JSON theo format sau (không có markdown):
+{
+  "prizes": {
+    "Đặc Biệt": ["123456"],
+    "Giải Nhất": ["12345"],
+    "Giải Nhì": ["12345"],
+    "Giải Ba": ["12345","67890"],
+    "Giải Tư": ["1234","5678","9012","3456","7890","1234","5678"],
+    "Giải Năm": ["1234"],
+    "Giải Sáu": ["123","456","789"],
+    "Giải Bảy": ["12","34","56","78"],
+    "Giải Tám": ["12","34","56"]
+  },
+  "station": "tên đài",
+  "date": "ngày xổ"
+}
+
+Nếu không tìm thấy kết quả xổ số trong nội dung, trả về: {"error": "Không có kết quả"}`
+
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 1000,
+    temperature: 0.1,
   })
 
-  // Strategy 2: look for elements with class names containing prize keywords
-  if (Object.keys(prizes).length === 0) {
-    $('[class*="giai"], [class*="prize"], [class*="special"]').each((_, el) => {
-      const text = $(el).text().trim()
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-      for (let i = 0; i < lines.length; i++) {
-        const mapped = normalizePrizeName(lines[i])
-        if (mapped) {
-          const nums = []
-          for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-            extractNumbers(lines[j]).forEach(n => nums.push(n))
-            if (normalizePrizeName(lines[j])) break
-          }
-          if (nums.length) {
-            if (!prizes[mapped]) prizes[mapped] = []
-            prizes[mapped].push(...nums)
-          }
-        }
-      }
-    })
-  }
-
-  // Strategy 3: full text parse — look for prize name followed by numbers
-  if (Object.keys(prizes).length === 0) {
-    const fullText = $.root().text()
-    const lines = fullText.split(/[\n\r]+/).map(l => l.trim()).filter(l => l.length > 0)
-    let currentPrize = null
-    for (const line of lines) {
-      const mapped = normalizePrizeName(line)
-      if (mapped) {
-        currentPrize = mapped
-        if (!prizes[currentPrize]) prizes[currentPrize] = []
-      } else if (currentPrize) {
-        const nums = extractNumbers(line)
-        if (nums.length > 0) {
-          prizes[currentPrize].push(...nums)
-          // Only add numbers to first matching line then reset
-        } else if (line.length > 1 && !/^\s*$/.test(line)) {
-          currentPrize = null // next meaningful text resets
-        }
-      }
-    }
-  }
-
-  // Deduplicate
-  for (const k of Object.keys(prizes)) {
-    prizes[k] = [...new Set(prizes[k])]
-  }
-
-  // Sort by standard prize order
-  const sorted = {}
-  for (const name of PRIZE_ORDER) {
-    if (prizes[name]?.length) sorted[name] = prizes[name]
-  }
-  // Add any extra prizes we found
-  for (const [k, v] of Object.entries(prizes)) {
-    if (!sorted[k] && v.length) sorted[k] = v
-  }
-
-  return sorted
+  const raw = completion.choices[0]?.message?.content ?? '{}'
+  const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim()
+  return JSON.parse(cleaned)
 }
 
 export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
+  if (event.httpMethod !== 'POST')
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
-  }
+
+  const apiKey = process.env.GROQ_API_KEY
+  if (!apiKey)
+    return { statusCode: 500, body: JSON.stringify({ error: 'GROQ_API_KEY chưa cấu hình' }) }
 
   let body
-  try {
-    body = JSON.parse(event.body)
-  } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }
-  }
+  try { body = JSON.parse(event.body) }
+  catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) } }
 
   const { date, region, province } = body
-  if (!date || !region) {
+  if (!date || !region)
     return { statusCode: 400, body: JSON.stringify({ error: 'Thiếu date hoặc region' }) }
-  }
 
-  // Build URL variants to try
-  const urls = [
-    `https://xosominhngoc.com/ket-qua-xo-so/${region}/${date}`,
-    `https://xosominhngoc.com/ket-qua-xo-so/${region}/`,
-    `https://xosominhngoc.com/`,
-  ]
-
+  const urls = buildUrls(date, region)
   let html = null
-  let usedUrl = null
+  let fetchError = ''
+
   for (const url of urls) {
     try {
       html = await fetchHTML(url)
-      usedUrl = url
-      break
+      // Kiểm tra có nội dung xổ số không
+      const lc = html.toLowerCase()
+      if (lc.includes('đặc biệt') || lc.includes('giai nhat') || lc.includes('giải nhất') || lc.includes('kqxs')) {
+        break // URL này có dữ liệu
+      }
+      html = null // Thử URL khác
     } catch (e) {
-      console.error('Failed URL:', url, e.message)
+      fetchError = e.message
+      console.error('Fetch failed:', e.message)
     }
   }
 
   if (!html) {
     return {
       statusCode: 502,
-      body: JSON.stringify({ error: 'Không thể kết nối đến xosominhngoc.com. Vui lòng thử lại sau.' }),
+      body: JSON.stringify({
+        error: `Không kết nối được xosominhngoc.com. Lỗi: ${fetchError}. Vui lòng thử lại sau.`
+      })
     }
   }
 
-  const prizes = parseResultsHTML(html)
+  // Trích xuất phần text liên quan rồi cho Groq phân tích
+  const relevantText = extractRelevantText(html)
 
-  if (Object.keys(prizes).length === 0) {
+  let parsed
+  try {
+    parsed = await parseWithGroq(relevantText, apiKey, date, region)
+  } catch (e) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'AI phân tích thất bại: ' + e.message })
+    }
+  }
+
+  if (parsed.error) {
     return {
       statusCode: 404,
       body: JSON.stringify({
-        error: `Không tìm thấy kết quả xổ số cho ngày ${date}. Có thể chưa có kết quả hoặc ngày không hợp lệ.`,
-      }),
+        error: `Không tìm thấy kết quả xổ số cho ngày ${date}. Có thể chưa có kết quả hoặc đài không xổ ngày này.`
+      })
+    }
+  }
+
+  // Validate prizes có dữ liệu không
+  const prizes = parsed.prizes ?? {}
+  if (Object.keys(prizes).length === 0) {
+    return {
+      statusCode: 404,
+      body: JSON.stringify({ error: `Không có dữ liệu kết quả cho ngày ${date}.` })
     }
   }
 
@@ -184,9 +178,8 @@ export const handler = async (event) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prizes,
-      date,
-      station: province ?? region,
-      source: usedUrl,
-    }),
+      date: parsed.date || date,
+      station: parsed.station || province,
+    })
   }
 }
