@@ -1,0 +1,250 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #1a0a00 0%, #2d0d0d 50%, #1a0500 100%);
+  min-height: 100vh;
+}
+
+/* Gold shimmer text */
+.text-shimmer {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #f1c40f, #fbbf24, #f59e0b);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Card styles */
+.card-lottery {
+  background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+/* Input styles */
+.input-lottery {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fef3c7;
+  transition: all 0.3s ease;
+}
+
+.input-lottery:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  background: rgba(0,0,0,0.6);
+}
+
+.input-lottery::placeholder {
+  color: rgba(254, 243, 199, 0.3);
+}
+
+/* Button gold */
+.btn-gold {
+  background: linear-gradient(135deg, #d97706, #f59e0b, #d97706);
+  background-size: 200% auto;
+  color: #1a0a00;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+}
+
+.btn-gold:hover {
+  background-position: right center;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-gold:active {
+  transform: translateY(0);
+}
+
+/* Button red */
+.btn-red {
+  background: linear-gradient(135deg, #922b21, #c0392b, #922b21);
+  background-size: 200% auto;
+  color: #fef3c7;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(192, 57, 43, 0.3);
+}
+
+.btn-red:hover {
+  background-position: right center;
+  box-shadow: 0 6px 20px rgba(192, 57, 43, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Prize table styles */
+.prize-row {
+  transition: all 0.3s ease;
+}
+
+.prize-row.winning {
+  background: linear-gradient(90deg, rgba(192, 57, 43, 0.3), rgba(245, 158, 11, 0.3));
+  border: 1px solid #f59e0b;
+  animation: bounce-in 0.6s ease-out;
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Number highlight */
+.number-highlight {
+  background: linear-gradient(135deg, #c0392b, #f59e0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 900;
+  font-size: 1.1em;
+}
+
+/* Ticket number display */
+.ticket-digit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 50px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fbbf24;
+  margin: 0 2px;
+  transition: all 0.3s ease;
+}
+
+.ticket-digit.matched {
+  background: linear-gradient(135deg, #922b21, #c0392b);
+  border-color: #f59e0b;
+  color: #fff;
+  box-shadow: 0 0 15px rgba(192, 57, 43, 0.6);
+}
+
+/* Loading spinner */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(245, 158, 11, 0.2);
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Win banner */
+.win-banner {
+  background: linear-gradient(135deg, #922b21 0%, #c0392b 30%, #d97706 60%, #f59e0b 100%);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(192, 57, 43, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.7), 0 0 80px rgba(192, 57, 43, 0.4); }
+}
+
+/* Dragon decoration */
+.dragon-divider {
+  text-align: center;
+  color: #f59e0b;
+  font-size: 1.5rem;
+  opacity: 0.6;
+  letter-spacing: 8px;
+}
+
+/* Prize number box */
+.prize-number-box {
+  display: inline-block;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: #fde68a;
+  margin: 2px;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.prize-number-box.matched {
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  border-color: #f59e0b;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.6);
+  transform: scale(1.1);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(245, 158, 11, 0.4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(245, 158, 11, 0.6); }
+
+/* Select styles */
+select.input-lottery option {
+  background: #1a0a00;
+  color: #fef3c7;
+}
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed rgba(245, 158, 11, 0.3);
+  background: rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.upload-zone:hover {
+  border-color: rgba(245, 158, 11, 0.6);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.upload-zone.dragging {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-win {
+  background: rgba(192, 57, 43, 0.2);
+  border: 1px solid #c0392b;
+  color: #f1948a;
+}
+
+.status-lose {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.5);
+}

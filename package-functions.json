@@ -1,0 +1,9 @@
+{
+  "name": "do-ve-so-functions",
+  "version": "1.0.0",
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "node-fetch": "^3.3.2",
+    "groq-sdk": "^0.7.0"
+  }
+}
