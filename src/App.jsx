@@ -61,67 +61,124 @@ const fireConfetti = () => {
 let _id = 0
 const newTicket = (num='') => ({ id: ++_id, number: num, label: '' })
 
-// ─── TicketRow component ──────────────────────────────────────────────────────
-function TicketRow({ ticket, index, onChange, onRemove, canRemove, result }) {
-  const isWin  = result && result.wins.length > 0
-  const isLose = result && result.wins.length === 0
-
+// ─── TicketRow (nhập liệu) ────────────────────────────────────────────────────
+function TicketRow({ ticket, index, onChange, onRemove, canRemove }) {
   return (
-    <div className={`rounded-xl p-3 mb-2 transition-all ${
-      isWin  ? 'bg-gradient-to-r from-red-900/40 to-yellow-900/30 border border-yellow-500/50' :
-      isLose ? 'bg-black/30 border border-gray-700/30' :
-               'bg-black/20 border border-yellow-900/20'
-    }`}>
+    <div className="rounded-xl p-3 mb-2 bg-black/20 border border-yellow-900/20">
       <div className="flex items-center gap-2">
-        {/* Index badge */}
         <div className="flex-shrink-0 w-7 h-7 rounded-full bg-yellow-900/50 border border-yellow-700/40 flex items-center justify-center text-yellow-400 text-xs font-bold">
           {index+1}
         </div>
-
-        {/* Number input */}
         <input
-          type="text"
-          inputMode="numeric"
-          placeholder="6 số vé"
-          maxLength={6}
+          type="text" inputMode="numeric" placeholder="6 số vé" maxLength={6}
           value={ticket.number}
           onChange={e => onChange(ticket.id, 'number', e.target.value.replace(/\D/g,'').slice(0,6))}
           className="input-lottery flex-1 rounded-lg px-3 py-2 text-base font-mono tracking-[0.2em] text-center min-w-0"
         />
-
-        {/* Label input */}
         <input
-          type="text"
-          placeholder="Ghi chú"
-          value={ticket.label}
+          type="text" placeholder="Ghi chú" value={ticket.label}
           onChange={e => onChange(ticket.id, 'label', e.target.value)}
           className="input-lottery rounded-lg px-2 py-2 text-xs w-20 sm:w-28"
         />
-
-        {/* Remove button */}
         {canRemove && (
-          <button
-            onClick={() => onRemove(ticket.id)}
-            className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-800/60 flex items-center justify-center transition-all"
-          >✕</button>
+          <button onClick={() => onRemove(ticket.id)}
+            className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-900/40 border border-red-700/40 text-red-400 hover:bg-red-800/60 flex items-center justify-center transition-all">✕</button>
         )}
       </div>
+    </div>
+  )
+}
 
-      {/* Result inline */}
-      {result && (
-        <div className={`mt-2 text-xs px-2 flex items-center gap-2 flex-wrap ${isWin ? 'text-yellow-300' : 'text-gray-500'}`}>
+// ─── TicketResultRow (kết quả, có expand) ────────────────────────────────────
+function TicketResultRow({ ticket, index, result, prizes, expanded, onToggle }) {
+  const isWin = result?.wins?.length > 0
+  const totalWin = result?.wins?.reduce((s,w) => s+w.value, 0) ?? 0
+
+  return (
+    <div className={`rounded-xl mb-2 overflow-hidden border transition-all duration-300 ${
+      isWin ? 'border-yellow-500/60 shadow-lg shadow-yellow-900/20' : 'border-gray-700/30'
+    }`}>
+      {/* ── Header row — nhấn để expand ── */}
+      <button
+        onClick={onToggle}
+        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+          isWin
+            ? 'bg-gradient-to-r from-red-900/50 via-yellow-900/30 to-red-900/40 hover:from-red-900/60'
+            : 'bg-black/30 hover:bg-black/40'
+        }`}
+      >
+        {/* Index */}
+        <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+          isWin ? 'bg-yellow-500 text-black' : 'bg-gray-800 text-gray-400'
+        }`}>{index+1}</div>
+
+        {/* Số vé */}
+        <div className="flex-1 min-w-0">
+          <span className="font-mono font-bold text-base tracking-widest text-yellow-200">{ticket.number}</span>
+          {ticket.label && <span className="ml-2 text-xs text-gray-400">({ticket.label})</span>}
+        </div>
+
+        {/* Kết quả tóm tắt */}
+        <div className="flex-shrink-0 flex items-center gap-2">
           {isWin ? (
-            <>
-              <span className="text-green-400 font-bold">🏆 TRÚNG!</span>
-              {result.wins.map((w,i) => (
-                <span key={i} className="bg-red-900/50 border border-red-600/40 text-red-200 px-2 py-0.5 rounded-full font-semibold">
-                  {w.prize} ({w.number}) +{fmtMoney(w.value)}
-                </span>
-              ))}
-            </>
+            <div className="flex flex-col items-end">
+              <span className="text-yellow-300 font-bold text-sm">🏆 TRÚNG!</span>
+              <span className="text-yellow-400 text-xs">+{fmtMoney(totalWin)}</span>
+            </div>
           ) : (
-            <span>😔 Không trúng giải nào</span>
+            <span className="text-gray-500 text-sm">TRẬT ❌</span>
           )}
+          {/* Mũi tên expand */}
+          <span className={`text-gray-500 text-xs transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▼</span>
+        </div>
+      </button>
+
+      {/* ── Chi tiết mở rộng inline ── */}
+      {expanded && (
+        <div className="bg-black/40 px-4 py-3 border-t border-gray-700/30">
+
+          {/* Giải trúng nổi bật */}
+          {isWin && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {result.wins.map((w,i) => (
+                <div key={i} className="flex items-center gap-2 bg-gradient-to-r from-red-900/60 to-yellow-900/40 border border-yellow-500/50 rounded-lg px-3 py-2">
+                  <span className="text-xl">🏆</span>
+                  <div>
+                    <div className="text-yellow-300 font-bold text-sm">{w.prize}</div>
+                    <div className="text-yellow-400 text-xs font-mono">Số {w.number} · +{fmtMoney(w.value)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Bảng kết quả đối chiếu */}
+          <div className="space-y-1">
+            {prizes && Object.entries(prizes).map(([prizeName, numbers]) => {
+              const meta = PRIZE_VALUES[prizeName]
+              const matchedNums = result?.wins?.filter(w=>w.prize===prizeName).map(w=>w.number) ?? []
+              const isWinRow = matchedNums.length > 0
+              return (
+                <div key={prizeName} className={`rounded-lg px-3 py-2 flex items-start gap-2 ${isWinRow ? 'bg-gradient-to-r from-red-900/40 to-yellow-900/20 border border-yellow-500/30' : 'bg-black/20'}`}>
+                  <div className="flex-shrink-0 w-20">
+                    <div className="text-xs font-bold" style={{color: meta?.color ?? '#f59e0b'}}>{prizeName}</div>
+                    {meta && <div className="text-gray-600 text-xs">{fmtMoney(meta.value)}</div>}
+                  </div>
+                  <div className="flex-1 flex flex-wrap gap-1">
+                    {numbers.map((num,i) => {
+                      const n = num.replace(/\s/g,'')
+                      const matched = matchedNums.includes(n)
+                      return (
+                        <span key={i} className={`prize-number-box text-xs ${matched ? 'matched' : ''}`}>
+                          {matched ? '⭐' : ''}{num}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -148,10 +205,11 @@ export default function App() {
 
   // results
   const [checking,     setChecking]     = useState(false)
-  const [results,      setResults]      = useState(null)  // { prizes, byTicket:{id:{wins}} }
+  const [results,      setResults]      = useState(null)
   const [prizes,       setPrizes]       = useState(null)
   const [error,        setError]        = useState('')
   const [dragging,     setDragging]     = useState(false)
+  const [expandedId,   setExpandedId]   = useState(null)
 
   const cameraRef  = useRef()
   const galleryRef = useRef()
@@ -430,81 +488,34 @@ export default function App() {
               </div>
             )}
 
-            {/* Per-ticket summary */}
-            {checkedCount > 1 && (
-              <div className="space-y-2">
-                <h3 className="text-gold-400 font-bold text-sm uppercase tracking-wider flex items-center gap-2">🎟️ Kết Quả Từng Vé</h3>
-                {tickets.filter(t=>t.number.length>=2).map((t,i) => {
-                  const r = results.byTicket[t.id]
-                  if (!r) return null
-                  const won = r.wins.length > 0
-                  return (
-                    <div key={t.id} className={`rounded-xl px-3 py-2.5 flex items-center gap-3 ${won?'bg-gradient-to-r from-red-900/40 to-yellow-900/30 border border-yellow-500/40':'bg-black/30 border border-gray-700/30'}`}>
-                      <div className="w-6 h-6 rounded-full bg-black/40 flex items-center justify-center text-xs text-yellow-600 font-bold flex-shrink-0">{i+1}</div>
-                      <div className="font-mono font-bold text-yellow-300 text-base tracking-widest w-20">{t.number}</div>
-                      {t.label && <div className="text-gray-500 text-xs">{t.label}</div>}
-                      <div className="flex-1 text-right">
-                        {won ? (
-                          <div className="flex flex-col items-end gap-0.5">
-                            {r.wins.map((w,j)=>(
-                              <span key={j} className="text-xs text-yellow-300 font-semibold">🏆 {w.prize} +{fmtMoney(w.value)}</span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-600">Không trúng</span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
             {/* Draw info */}
-            <div className="flex flex-wrap gap-2 text-xs text-gold-600 bg-black/20 rounded-lg px-3 py-2">
+            <div className="flex flex-wrap gap-3 text-xs text-gold-600 bg-black/20 rounded-lg px-3 py-2">
               <span>📅 {results.drawDate}</span>
               <span>🏛️ {results.station}</span>
             </div>
 
-            {/* Prize table */}
-            {prizes && (
-              <div>
-                <h3 className="text-gold-400 font-bold text-sm uppercase tracking-wider mb-2 flex items-center gap-2">📊 Bảng Kết Quả Xổ Số</h3>
-                <div className="space-y-1">
-                  {Object.entries(prizes).map(([prizeName, numbers]) => {
-                    const meta = PRIZE_VALUES[prizeName]
-                    // Collect all matched numbers from all tickets
-                    const allMatchedNums = new Set()
-                    Object.values(results.byTicket).forEach(r => {
-                      r.wins.filter(w=>w.prize===prizeName).forEach(w=>allMatchedNums.add(w.number))
-                    })
-                    const isWinRow = allMatchedNums.size > 0
-                    return (
-                      <div key={prizeName} className={`prize-row rounded-xl px-3 py-2 ${isWinRow?'winning':'bg-black/20'}`}>
-                        <div className="flex items-start gap-2">
-                          <div className="flex-shrink-0 w-20">
-                            <div className="text-xs font-bold" style={{color:meta?.color??'#f59e0b'}}>{prizeName}</div>
-                            {meta && <div className="text-gray-600 text-xs">{fmtMoney(meta.value)}</div>}
-                          </div>
-                          <div className="flex-1 flex flex-wrap gap-1">
-                            {numbers.map((num,i) => {
-                              const n = num.replace(/\s/g,'')
-                              const matched = allMatchedNums.has(n)
-                              return (
-                                <span key={i} className={`prize-number-box ${matched?'matched':''}`}>
-                                  {matched?'⭐ ':''}{num}
-                                </span>
-                              )
-                            })}
-                          </div>
-                          {isWinRow && <span className="status-win status-badge flex-shrink-0">🏆</span>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Danh sách từng tờ — có expand inline */}
+            <div>
+              <h3 className="text-gold-400 font-bold text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
+                🎟️ Kết Quả Từng Tờ
+                <span className="text-gray-500 text-xs font-normal normal-case">— nhấn vào tờ để xem chi tiết</span>
+              </h3>
+              {tickets.filter(t => t.number.length >= 2).map((t, i) => {
+                const r = results.byTicket[t.id]
+                if (!r) return null
+                return (
+                  <TicketResultRow
+                    key={t.id}
+                    ticket={t}
+                    index={i}
+                    result={r}
+                    prizes={prizes}
+                    expanded={expandedId === t.id}
+                    onToggle={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                  />
+                )
+              })}
+            </div>
 
             <div className="dragon-divider text-sm">✦ ✦ ✦ ✦ ✦</div>
             <p className="text-center text-gray-700 text-xs">Nguồn: xosominhngoc.com · Chỉ mang tính tham khảo</p>
